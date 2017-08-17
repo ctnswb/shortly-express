@@ -3,6 +3,7 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+var bcrypt = require('bcrypt-nodejs');
 
 
 var db = require('./app/config');
@@ -97,7 +98,10 @@ app.post('/login',
     db.knex('users').where('username', '=', req.body.username)
       .then(function(query) {
         if (query[0]) {
-          if (query[0].password === req.body.password) {
+          var salt = bcrypt.genSaltSync(10);
+          var hash = bcrypt.hashSync(req.body.password, salt);
+
+          if (bcrypt.compareSync(query[0].password, hash)) {
             // saving user to session
             req.session.regenerate(function() {
               req.session.user = req.body.username;
@@ -126,10 +130,14 @@ app.get('/signup',
 
 app.post('/signup',
   function(req, res) {
-    var userModel = new User({
-      username: req.body.username,
-      password: req.body.password
-    }).save();
+    var salt = bcrypt.genSaltSync(10);
+
+    bcrypt.hash(req.body.password, salt, null, function(err, hash) {
+      var userModel = new User({
+        username: req.body.username,
+        password: hash //req.body.password
+      }).save();
+    });
 
     req.session.regenerate(function() {
       req.session.user = req.body.username;
